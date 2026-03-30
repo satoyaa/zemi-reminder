@@ -14,6 +14,8 @@ import os
 import sys
 import time
 import argparse
+from datetime import datetime    # 時刻取得用に追加
+from zoneinfo import ZoneInfo    # タイムゾーン指定用に追加
 
 DEFAULT_MESSAGE = "【リマインダー】予定の確認をお願いします。"
 
@@ -27,13 +29,11 @@ def build_args():
 def send_message(token: str, to: str, message: str) -> bool:
     import requests
 
-    # Messaging APIのPush Messageエンドポイント
     url = "https://api.line.me/v2/bot/message/push"
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
     }
-    # 送信先IDとメッセージ内容をJSON形式で構築
     data = {
         "to": to,
         "messages": [
@@ -44,10 +44,8 @@ def send_message(token: str, to: str, message: str) -> bool:
         ]
     }
     
-    # dataではなくjson引数を使用します
     resp = requests.post(url, headers=headers, json=data, timeout=10)
     
-    # デバッグ用にエラーメッセージを出力するよう改善
     if resp.status_code == 200:
         return True
     else:
@@ -56,9 +54,17 @@ def send_message(token: str, to: str, message: str) -> bool:
 
 def main():
     args = build_args()
-    message = args.message or os.getenv("REMINDER_MESSAGE") or DEFAULT_MESSAGE
+    base_message = args.message or os.getenv("REMINDER_MESSAGE") or DEFAULT_MESSAGE
     token = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
-    to = os.getenv("LINE_TO") # 送信先IDの環境変数を追加
+    to = os.getenv("LINE_TO")
+
+    # --- 変更点：日本時間で現在時刻を取得し、メッセージに結合する ---
+    now_jst = datetime.now(ZoneInfo("Asia/Tokyo"))
+    time_str = now_jst.strftime("%Y/%m/%d %H:%M") # 例: 2026/03/30 15:30
+    
+    # 元のメッセージの末尾に時刻を追加
+    message = f"{base_message}\n\n(送信日時: {time_str})"
+    # -----------------------------------------------------------
 
     if args.dry_run:
         print("[dry-run] message to send:\n", message)
