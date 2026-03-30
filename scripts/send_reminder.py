@@ -52,7 +52,7 @@ def main():
     date_str = target_date.strftime("%-m月%-d日")
     
     # ご要望のメッセージを作成
-    message = f"来週{date_str}，予定があります．"
+    message = f"明日{date_str},4限にゼミがあります．\n忘れないようにしてください．"
     # -----------------------------------
 
     if args.dry_run:
