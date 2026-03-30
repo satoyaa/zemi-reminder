@@ -1,11 +1,11 @@
-name: Send Test
+name: Send Reminder # 名前も本番っぽく変更してOKです
 
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-  workflow_dispatch: {} # 手動でテストを実行できるように追加
+  schedule:
+    # 日本時間の毎週日曜日 18:00（UTCの09:00）に実行
+    # cronの書式: '分 時 日 月 曜日(0が日曜日)'
+    - cron: '0 9 * * 0'
+  workflow_dispatch: {} # 手動でテスト実行できるボタンは残しておくと便利です
 
 jobs:
   test-send:
