@@ -1,0 +1,35 @@
+name: Send Test
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch: {} # 手動でテストを実行できるように追加
+
+jobs:
+  test-send:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          
+      - name: Run script for testing
+        env:
+          # 本番用とは別に「テスト用のシークレット」を用意することをおすすめします
+          LINE_NOTIFY_TOKEN: ${{ secrets.LINE_NOTIFY_TEST_TOKEN }}
+          # メッセージはテストだと分かるように直接指定するか、シークレットを使用します
+          REMINDER_MESSAGE: "【テスト】GitHub Actionsからの送信テストです"
+        run: |
+          # 既存のスクリプトをそのまま実行します
+          python scripts/send_reminder.py
