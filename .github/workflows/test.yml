@@ -12,10 +12,10 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           
@@ -26,10 +26,8 @@ jobs:
           
       - name: Run script for testing
         env:
-          # 本番用とは別に「テスト用のシークレット」を用意することをおすすめします
-          LINE_NOTIFY_TOKEN: ${{ secrets.LINE_NOTIFY_TEST_TOKEN }}
-          # メッセージはテストだと分かるように直接指定するか、シークレットを使用します
-          REMINDER_MESSAGE: "【テスト】GitHub Actionsからの送信テストです"
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_TO: ${{ secrets.LINE_TO_TEST_GROUP }} # テスト用グループのID
+          REMINDER_MESSAGE: "【テスト】Messaging APIからの送信テストです"
         run: |
-          # 既存のスクリプトをそのまま実行します
           python scripts/send_reminder.py

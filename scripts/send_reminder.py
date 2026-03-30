@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 """
-Send a LINE Notify reminder.
+Send a LINE Messaging API reminder.
 
 Usage:
   python scripts/send_reminder.py [--dry-run] [--message "..."]
 
 Environment:
-  LINE_NOTIFY_TOKEN: required unless --dry-run
+  LINE_CHANNEL_ACCESS_TOKEN: required unless --dry-run
+  LINE_TO: User ID, Group ID, or Room ID to send the message to (required unless --dry-run)
   REMINDER_MESSAGE: optional default message override
-
-The script avoids importing `requests` when running in dry-run mode so local tests
-without installing dependencies are convenient.
 """
 import os
 import sys
@@ -19,7 +17,6 @@ import argparse
 
 DEFAULT_MESSAGE = "【リマインダー】予定の確認をお願いします。"
 
-
 def build_args():
     p = argparse.ArgumentParser()
     p.add_argument("--dry-run", action="store_true", help="Do not send, only print the message")
@@ -27,36 +24,55 @@ def build_args():
     p.add_argument("--retries", type=int, default=3, help="Number of retries on failure")
     return p.parse_args()
 
-
-def send_message(token: str, message: str) -> bool:
-    # import here to allow dry-run without installing requests
+def send_message(token: str, to: str, message: str) -> bool:
     import requests
 
-    url = "https://notify-api.line.me/api/notify"
-    headers = {"Authorization": f"Bearer {token}"}
-    data = {"message": message}
-    resp = requests.post(url, headers=headers, data=data, timeout=10)
-    return resp.status_code == 200
-
+    # Messaging APIのPush Messageエンドポイント
+    url = "https://api.line.me/v2/bot/message/push"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+    # 送信先IDとメッセージ内容をJSON形式で構築
+    data = {
+        "to": to,
+        "messages": [
+            {
+                "type": "text",
+                "text": message
+            }
+        ]
+    }
+    
+    # dataではなくjson引数を使用します
+    resp = requests.post(url, headers=headers, json=data, timeout=10)
+    
+    # デバッグ用にエラーメッセージを出力するよう改善
+    if resp.status_code == 200:
+        return True
+    else:
+        print(f"API Error: {resp.status_code} - {resp.text}")
+        return False
 
 def main():
     args = build_args()
     message = args.message or os.getenv("REMINDER_MESSAGE") or DEFAULT_MESSAGE
-    token = os.getenv("LINE_NOTIFY_TOKEN")
+    token = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
+    to = os.getenv("LINE_TO") # 送信先IDの環境変数を追加
 
     if args.dry_run:
         print("[dry-run] message to send:\n", message)
         return 0
 
-    if not token:
-        print("ERROR: environment variable LINE_NOTIFY_TOKEN is required (or run with --dry-run)")
+    if not token or not to:
+        print("ERROR: environment variables LINE_CHANNEL_ACCESS_TOKEN and LINE_TO are required")
         return 2
 
     retries = max(0, args.retries)
     backoff = 1
     for attempt in range(1, retries + 1):
         try:
-            ok = send_message(token, message)
+            ok = send_message(token, to, message)
             if ok:
                 print(f"Sent reminder (attempt {attempt})")
                 return 0
@@ -71,7 +87,6 @@ def main():
 
     print("Failed to send reminder after retries")
     return 1
-
 
 if __name__ == '__main__':
     sys.exit(main())
