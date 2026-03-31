@@ -126,7 +126,7 @@ def main():
         sys.exit(0) # 正常終了（LINEは送らない）
 
     # 送信するメッセージを作成
-    message_lines = ["【明日の予定リマインド】", "以下の予定が入っています．\n"]
+    message_lines = ["このメッセージはテストです．気にしないでください", "【明日の予定リマインド】", "以下の予定が入っています．\n"]
     for event in events:
         message_lines.append(f"・{event}")
     
