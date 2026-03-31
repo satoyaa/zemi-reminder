@@ -63,7 +63,7 @@ def get_upcoming_events():
 
     now_jst = datetime.now(ZoneInfo("Asia/Tokyo"))
     # 現在時刻（20:00）から24時間後（翌日の20:00）を期限とする
-    deadline_jst = now_jst + timedelta(days=7)
+    deadline_jst = now_jst + timedelta(days=1)
     
     upcoming_events = []
     
@@ -126,12 +126,12 @@ def main():
         sys.exit(0) # 正常終了（LINEは送らない）
 
     # 送信するメッセージを作成
-    message_lines = ["このメッセージはテストです．気にしないでください", "【明日の予定リマインド】", "以下の予定が入っています．\n"]
+    message_lines = ["【明日の予定リマインド】", "以下の予定があります．\n"]
     for event in events:
         message_lines.append(f"・{event}")
-    
-    final_message = "\n".join(message_lines)
     message_lines.append("\nお忘れないようによろしくお願いいたします．")
+    final_message = "\n".join(message_lines)
+    
     print("以下のメッセージを送信します:\n", final_message)
 
     # LINE送信（リトライ処理付き）
