@@ -63,7 +63,7 @@ def get_upcoming_events():
 
     now_jst = datetime.now(ZoneInfo("Asia/Tokyo"))
     # 現在時刻（20:00）から24時間後（翌日の20:00）を期限とする
-    deadline_jst = now_jst + timedelta(days=3)
+    deadline_jst = now_jst + timedelta(days=7)
     
     upcoming_events = []
     
