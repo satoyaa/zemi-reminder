@@ -1,11 +1,8 @@
-name: Send Reminder # 名前も本番っぽく変更してOKです
+name: Test Reminder (Scraping)
 
 on:
-  schedule:
-    # 日本時間の毎週日曜日 18:00（UTCの09:00）に実行
-    # cronの書式: '分 時 日 月 曜日(0が日曜日)'
-    - cron: '0 9 * * 0'
-  workflow_dispatch: {} # 手動でテスト実行できるボタンは残しておくと便利です
+  # テスト用なので定期実行(cron)は外し、手動実行のみにしています
+  workflow_dispatch: {}
 
 jobs:
   test-send:
@@ -23,11 +20,21 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          # スクレイピング用のライブラリを追加でインストール
+          pip install requests beautifulsoup4
           
       - name: Run script for testing
         env:
+          # LINE APIの設定（送信先をテスト用グループのIDに指定）
           LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
-          LINE_TO: ${{ secrets.LINE_TO_TEST_GROUP }} # テスト用グループのID
-          REMINDER_MESSAGE: "【テスト】Messaging APIからの送信テストです"
+          LINE_TO: ${{ secrets.LINE_TO_TEST_GROUP }}
+          
+          # 社内サービスログイン用の設定
+          SERVICE_LOGIN_ID: ${{ secrets.SERVICE_LOGIN_ID }}
+          SERVICE_PASSWORD: ${{ secrets.SERVICE_PASSWORD }}
+
+          # URL設定
+          LOGIN_URL: ${{ secrets.LOGIN_URL }}
+          SCHEDULE_URL: ${{ secrets.SCHEDULE_URL }}
         run: |
           python scripts/send_reminder.py

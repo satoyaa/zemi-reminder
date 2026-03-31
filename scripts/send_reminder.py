@@ -1,24 +1,105 @@
 #!/usr/bin/env python3
-"""
-Send a LINE Messaging API reminder.
-"""
 import os
 import sys
 import time
-import argparse
-from datetime import datetime, timedelta  # timedeltaを追加
+import re
+import requests
+from bs4 import BeautifulSoup
+import urllib3
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-# DEFAULT_MESSAGEは今回はコード内で直接作るので削除しても構いません
+# SSL警告を非表示にする
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-def build_args():
-    p = argparse.ArgumentParser()
-    p.add_argument("--dry-run", action="store_true", help="Do not send, only print the message")
-    p.add_argument("--retries", type=int, default=3, help="Number of retries on failure")
-    return p.parse_args()
+# === 設定部分（ご自身の環境に合わせて書き換えてください） ===
+LOGIN_URL = os.getenv("LOGIN_URL")
+SCHEDULE_URL = os.getenv("SCHEDULE_URL")
+
+# HTMLの要素に合わせてキー名を変更してください（例: wpName, wpPassword など）
+ID_KEY = "wpName"
+PASS_KEY = "wpPassword"
+# =========================================================
+
+def get_upcoming_events():
+    """スクレイピングを行って、24時間以内の予定リストを返す"""
+    # 秘匿情報は環境変数（GitHub Secrets）から取得
+    service_id = os.getenv("SERVICE_LOGIN_ID")
+    service_pass = os.getenv("SERVICE_PASSWORD")
+    
+    if not service_id or not service_pass:
+        print("エラー: SERVICE_LOGIN_ID または SERVICE_PASSWORD が設定されていません。")
+        sys.exit(1)
+
+    session = requests.Session()
+    session.verify = False # SSL検証スキップ
+
+    # 1. トークンの取得
+    pre_login_res = session.get(LOGIN_URL)
+    pre_login_soup = BeautifulSoup(pre_login_res.text, "html.parser")
+    token_input = pre_login_soup.find("input", {"name": "wpLoginToken"})
+    token_value = token_input.get("value") if token_input else ""
+
+    # 2. ログイン実行
+    login_payload = {
+        "title": "特別:ログイン",
+        ID_KEY: service_id,
+        PASS_KEY: service_pass,
+        "wpLoginAttempt": "ログイン",  # ログインボタンの名前（value）に合わせてください
+        "wpEditToken": "+\\",  # MediaWikiのCSRFトークン（必要な場合は取得してここに入れます）
+        "authAction": "login",  # MediaWikiの場合、ログインアクションを指定することがあります（必要に応じて）
+        "force": "",  # これもMediaWikiでログインを強制するためのパラメータ（必要に応じて）
+        "wpLoginToken": token_value,
+        # MediaWikiの場合、tokenなどが必要な場合があります。
+        # ログイン時のPayloadに他にも必須項目があればここに追加します。
+    }
+    session.post(LOGIN_URL, data=login_payload)
+
+    # 3. スケジュールページの取得と解析
+    schedule_res = session.get(SCHEDULE_URL)
+    soup = BeautifulSoup(schedule_res.text, "html.parser")
+    content = soup.find("div", class_="mw-parser-output")
+    
+    if not content:
+        print("スケジュールのdivが見つかりませんでした。")
+        return []
+
+    now_jst = datetime.now(ZoneInfo("Asia/Tokyo"))
+    # 現在時刻（20:00）から24時間後（翌日の20:00）を期限とする
+    deadline_jst = now_jst + timedelta(days=1)
+    
+    upcoming_events = []
+    
+    uls = content.find_all("ul")
+    for ul in uls:
+        lis = ul.find_all("li")
+        for li in lis:
+            text = li.text.strip()
+            # 「/」と「:」が含まれていればスケジュールとみなす
+            if "/" in text and ":" in text:
+                # 正規表現で「月, 日, 時, 分」の数字を抽出する
+                match = re.search(r"(\d{1,2})/(\d{1,2})\s+(\d{1,2}):(\d{1,2})", text)
+                if match:
+                    month, day, hour, minute = map(int, match.groups())
+                    year = now_jst.year
+                    
+                    # 年末対策（現在12月で、予定が1月なら来年とみなす）
+                    if now_jst.month == 12 and month == 1:
+                        year += 1
+                        
+                    try:
+                        # 予定の日時データを作成
+                        event_time = datetime(year, month, day, hour, minute, tzinfo=ZoneInfo("Asia/Tokyo"))
+                        
+                        # 「現在時刻」〜「明日の同じ時刻」の間にあるか判定
+                        if now_jst <= event_time <= deadline_jst:
+                            upcoming_events.append(text)
+                    except ValueError:
+                        pass # 日付として不正な文字列（2/30など）は無視
+                        
+    return upcoming_events
 
 def send_message(token: str, to: str, message: str) -> bool:
-    import requests
     url = "https://api.line.me/v2/bot/message/push"
     headers = {
         "Authorization": f"Bearer {token}",
@@ -29,58 +110,46 @@ def send_message(token: str, to: str, message: str) -> bool:
         "messages": [{"type": "text", "text": message}]
     }
     resp = requests.post(url, headers=headers, json=data, timeout=10)
-    if resp.status_code == 200:
-        return True
-    else:
-        print(f"API Error: {resp.status_code} - {resp.text}")
-        return False
+    return resp.status_code == 200
 
 def main():
-    args = build_args()
     token = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
     to = os.getenv("LINE_TO")
 
-    # --- 変更点：日付の自動計算 ---
-    # 日本時間で現在時刻（実行時の日曜日）を取得
-    now_jst = datetime.now(ZoneInfo("Asia/Tokyo"))
-    
-    # 来週の予定日を計算（例：日曜日実行なら、+1日して月曜日の日付にする）
-    # ※もし予定が「来週の水曜日」なら days=3 に変更してください
-    target_date = now_jst + timedelta(days=1)
-    
-    # 日付を文字列にする（Linux環境のGitHub Actionsでは %-m で「04月」ではなく「4月」になります）
-    date_str = target_date.strftime("%-m月%-d日")
-    
-    # ご要望のメッセージを作成
-    message = f"明日{date_str},4限にゼミがあります．\n忘れないようにしてください．"
-    # -----------------------------------
-
-    if args.dry_run:
-        print("[dry-run] message to send:\n", message)
-        return 0
-
     if not token or not to:
-        print("ERROR: environment variables LINE_CHANNEL_ACCESS_TOKEN and LINE_TO are required")
-        return 2
+        print("エラー: LINEの環境変数が設定されていません")
+        sys.exit(1)
 
-    retries = max(0, args.retries)
+    # 予定を取得
+    print("スケジュールの取得を開始します...")
+    events = get_upcoming_events()
+
+    if not events:
+        print("24時間以内の予定はありませんでした。終了します。")
+        sys.exit(0) # 正常終了（LINEは送らない）
+
+    # 送信するメッセージを作成
+    message_lines = ["【明日の予定リマインド】", "以下の予定が入っています。\n"]
+    for event in events:
+        message_lines.append(f"・{event}")
+    
+    final_message = "\n".join(message_lines)
+    print("以下のメッセージを送信します:\n", final_message)
+
+    # LINE送信（リトライ処理付き）
+    retries = 3
     backoff = 1
     for attempt in range(1, retries + 1):
         try:
-            ok = send_message(token, to, message)
-            if ok:
-                print(f"Sent reminder (attempt {attempt})")
+            if send_message(token, to, final_message):
+                print("送信完了")
                 return 0
-            else:
-                print(f"Attempt {attempt} failed: non-200 response")
         except Exception as e:
-            print(f"Attempt {attempt} exception: {e}")
+            print(f"エラー: {e}")
+            
+        time.sleep(backoff)
+        backoff *= 2
 
-        if attempt < retries:
-            time.sleep(backoff)
-            backoff *= 2
-
-    print("Failed to send reminder after retries")
     return 1
 
 if __name__ == '__main__':
