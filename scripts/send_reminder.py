@@ -12,11 +12,10 @@ from zoneinfo import ZoneInfo
 # SSL警告を非表示にする
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# === 設定部分（ご自身の環境に合わせて書き換えてください） ===
+# === 設定部分 ===
 LOGIN_URL = os.getenv("LOGIN_URL")
 SCHEDULE_URL = os.getenv("SCHEDULE_URL")
 
-# HTMLの要素に合わせてキー名を変更してください（例: wpName, wpPassword など）
 ID_KEY = "wpName"
 PASS_KEY = "wpPassword"
 # =========================================================
@@ -45,13 +44,11 @@ def get_upcoming_events():
         "title": "特別:ログイン",
         ID_KEY: service_id,
         PASS_KEY: service_pass,
-        "wpLoginAttempt": "ログイン",  # ログインボタンの名前（value）に合わせてください
-        "wpEditToken": "+\\",  # MediaWikiのCSRFトークン（必要な場合は取得してここに入れます）
-        "authAction": "login",  # MediaWikiの場合、ログインアクションを指定することがあります（必要に応じて）
-        "force": "",  # これもMediaWikiでログインを強制するためのパラメータ（必要に応じて）
+        "wpLoginAttempt": "ログイン",  
+        "wpEditToken": "+\\",  
+        "authAction": "login",  
+        "force": "",  
         "wpLoginToken": token_value,
-        # MediaWikiの場合、tokenなどが必要な場合があります。
-        # ログイン時のPayloadに他にも必須項目があればここに追加します。
     }
     session.post(LOGIN_URL, data=login_payload)
 
@@ -66,7 +63,7 @@ def get_upcoming_events():
 
     now_jst = datetime.now(ZoneInfo("Asia/Tokyo"))
     # 現在時刻（20:00）から24時間後（翌日の20:00）を期限とする
-    deadline_jst = now_jst + timedelta(days=1)
+    deadline_jst = now_jst + timedelta(days=3)
     
     upcoming_events = []
     
