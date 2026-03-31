@@ -73,7 +73,7 @@ def get_upcoming_events():
         for li in lis:
             text = li.text.strip()
             # 「/」と「:」が含まれていればスケジュールとみなす
-            if "/" in text and ":" in text:
+            if "/" in text and ":" in text and "M・B4ゼミナール" in text:
                 # 正規表現で「月, 日, 時, 分」の数字を抽出する
                 match = re.search(r"(\d{1,2})/(\d{1,2})\s+(\d{1,2}):(\d{1,2})", text)
                 if match:
@@ -126,11 +126,12 @@ def main():
         sys.exit(0) # 正常終了（LINEは送らない）
 
     # 送信するメッセージを作成
-    message_lines = ["【明日の予定リマインド】", "以下の予定が入っています。\n"]
+    message_lines = ["【明日の予定リマインド】", "以下の予定が入っています．\n"]
     for event in events:
         message_lines.append(f"・{event}")
     
     final_message = "\n".join(message_lines)
+    message_lines.append("\nお忘れないようによろしくお願いいたします．")
     print("以下のメッセージを送信します:\n", final_message)
 
     # LINE送信（リトライ処理付き）
