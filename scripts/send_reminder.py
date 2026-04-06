@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 import urllib3
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+import random
 
 # SSL警告を非表示にする
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -73,7 +74,7 @@ def get_upcoming_events():
         for li in lis:
             text = li.text.strip()
             # 「/」と「:」が含まれていればスケジュールとみなす
-            if "/" in text and ":" in text and "M・B4ゼミナール" in text:
+            if "/" in text and ":" in text and "ゼミ" in text:
                 # 正規表現で「月, 日, 時, 分」の数字を抽出する
                 match = re.search(r"(\d{1,2})/(\d{1,2})\s+(\d{1,2}):(\d{1,2})", text)
                 if match:
@@ -124,6 +125,11 @@ def main():
     if not events:
         print("24時間以内の予定はありませんでした。終了します。")
         sys.exit(0) # 正常終了（LINEは送らない）
+    
+    r = random.randint(0, 100)
+    if r < 3: # 3%の確率で送らない
+        print("今日は送信しない日です（3%の確率）。終了します。")
+        sys.exit(0)
 
     # 送信するメッセージを作成
     message_lines = ["【明日の予定リマインド】", "以下の予定があります．\n"]
